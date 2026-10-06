@@ -5,65 +5,60 @@
 <title>FIFA 2v2 Turneringsgenerator</title>
 
 <style>
-
-body{
-    font-family:Arial,sans-serif;
-    max-width:1200px;
-    margin:auto;
-    padding:20px;
+body {
+    font-family: Arial, sans-serif;
+    max-width: 1200px;
+    margin: auto;
+    padding: 20px;
 }
 
-h1{
-    color:#166534;
+h1 {
+    color: #166534;
 }
 
-input{
-    padding:6px;
-    width:100px;
+input {
+    padding: 6px;
+    width: 100px;
 }
 
-button{
-    padding:10px 20px;
-    margin-top:10px;
-    cursor:pointer;
+button {
+    padding: 10px 20px;
+    margin-top: 10px;
+    cursor: pointer;
 }
 
-.match{
-    padding:8px;
-    border-bottom:1px solid #ddd;
+.match {
+    padding: 8px;
+    border-bottom: 1px solid #ddd;
 }
 
-.report{
-    margin-top:20px;
-    padding:15px;
-    background:#f7f7f7;
-    border-radius:8px;
+.report {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f7f7f7;
+    border-radius: 8px;
 }
 
-.good{
-    color:green;
-    font-weight:bold;
+.good {
+    color: green;
+    font-weight: bold;
 }
 
-.medium{
-    color:orange;
-    font-weight:bold;
+.medium {
+    color: orange;
+    font-weight: bold;
 }
 
-.bad{
-    color:red;
-    font-weight:bold;
+.bad {
+    color: red;
+    font-weight: bold;
 }
 
-.schedule{
-    margin-top:20px;
+.schedule {
+    margin-top: 20px;
 }
-
 </style>
 </head>
-   <script>
-alert("Sidan laddad");
-</script> 
 <body>
 
 <h1>FIFA 2v2 Gruppspelsgenerator</h1>
@@ -86,464 +81,261 @@ Generera schema
 
 <script>
 
-function key(a,b){
-    return a < b ? ${a}-${b} : ${b}-${a};
+function key(a, b) {
+    return a < b ? `${a}-${b}` : `${b}-${a}`;
 }
 
-function shuffle(array){
-
-    for(let i=array.length-1;i>0;i--){
-
-        const j=Math.floor(Math.random()(i+1));
-
-        [array[i],array[j]]=[array[j],array[i]];
+function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
     }
-
     return array;
 }
 
-function generateSchedule(){
-alert("knappen funkar");
-    const n=parseInt(document.getElementById("players").value);
-    const target=parseInt(document.getElementById("matches").value);
+function generateSchedule() {
+    const n = parseInt(document.getElementById("players").value);
+    const target = parseInt(document.getElementById("matches").value);
+    const output = document.getElementById("output");
 
-    const output=document.getElementById("output");
+    output.innerHTML = "";
 
-    output.innerHTML="";
-
-    if((ntarget)%4!==0){
-
-        output.innerHTML=
-        
+    if ((n * target) % 4 !== 0) {
+        output.innerHTML = `
         <h2>Ingen möjlig lösning</h2>
         <p>
-        Antal spelare × matcher per spelare
-        måste vara delbart med 4.
+        Antal spelare × matcher per spelare måste vara delbart med 4.
         </p>
-        ;
-
+        `;
         return;
     }
 
-    let bestSchedule=null;
-    let bestReport=null;
+    let bestSchedule = null;
+    let bestReport = null;
+    const runs = 100;
 
-    const runs=100;
+    for (let run = 0; run < runs; run++) {
+        const result = buildSchedule(n, target);
 
-    for(let run=0;run<runs;run++){
-
-        const result=buildSchedule(n,target);
-
-        if(!result.success){
+        if (!result.success) {
             continue;
         }
 
-        const report=analyzeSchedule(
-            result.schedule,
-            n
-        );
+        const report = analyzeSchedule(result.schedule, n);
 
-        if(
-            bestReport===null ||
-            report.qualityScore >
-            bestReport.qualityScore
-        ){
-            bestSchedule=result.schedule;
-            bestReport=report;
+        if (bestReport === null || report.qualityScore > bestReport.qualityScore) {
+            bestSchedule = result.schedule;
+            bestReport = report;
         }
-
     }
 
-    if(bestSchedule===null){
-
-        output.innerHTML=
-        "<h2>Kunde inte skapa schema.</h2>";
-
+    if (bestSchedule === null) {
+        output.innerHTML = "<h2>Kunde inte skapa schema. Spelarantalet och matcherna går inte ihop.</h2>";
         return;
     }
 
-    let html="";
+    let html = "";
+    html += "<div class='schedule'>";
+    html += "<h2>Spelschema</h2>";
 
-    html+="<div class='schedule'>";
-    html+="<h2>Spelschema</h2>";
-
-    bestSchedule.forEach((m,index)=>{
-
-        html+=
+    bestSchedule.forEach((m, index) => {
+        html += `
         <div class="match">
-        Match ${index+1}:<br>
-        ${m[0]} + ${m[1]}
-        vs
-        ${m[2]} + ${m[3]}
+        Match ${index + 1}:<br>
+        ${m[0]} + ${m[1]} vs ${m[2]} + ${m[3]}
         </div>
-        ;
-
+        `;
     });
 
-    html+="</div>";
+    html += "</div>";
+    html += reportHtml(bestReport);
 
-    html+=reportHtml(bestReport);
-
-    output.innerHTML=html;
+    output.innerHTML = html;
 }
 
-function buildSchedule(n,target){
+function buildSchedule(n, target) {
+    const played = Array(n + 1).fill(0);
+    const teammates = {};
+    const opponents = {};
+    const totalMatches = (n * target) / 4;
+    const schedule = [];
 
-    const played=
-        Array(n+1).fill(0);
+    for (let match = 0; match < totalMatches; match++) {
+        let best = null;
+        let bestScore = 9999999;
 
-    const teammates={};
-    const opponents={};
+        for (let tryNr = 0; tryNr < 10000; tryNr++) {
+            let available = [];
 
-    const totalMatches=
-        (n*target)/4;
-
-    const schedule=[];
-
-    for(let match=0;
-        match<totalMatches;
-        match++){
-
-        let best=null;
-        let bestScore=9999999;
-
-        for(let tryNr=0;
-            tryNr<10000;
-            tryNr++){
-
-            let available=[];
-
-            for(let p=1;
-                p<=n;
-                p++){
-
-                if(
-                    played[p] <
-                    target
-                ){
+            for (let p = 1; p <= n; p++) {
+                if (played[p] < target) {
                     available.push(p);
                 }
             }
 
-            if(
-                available.length < 4
-            ){
+            if (available.length < 4) {
                 break;
             }
 
             shuffle(available);
 
-            const p1=available[0];
-            const p2=available[1];
-            const p3=available[2];
-            const p4=available[3];
+            const p1 = available[0];
+            const p2 = available[1];
+            const p3 = available[2];
+            const p4 = available[3];
 
-            let score=0;
+            let score = 0;
 
-            score+=
-            (teammates[key(p1,p2)]
-            ||0)*1000;
+            score += (teammates[key(p1, p2)] || 0) * 1000;
+            score += (teammates[key(p3, p4)] || 0) * 1000;
+            score += (opponents[key(p1, p3)] || 0) * 10;
+            score += (opponents[key(p1, p4)] || 0) * 10;
+            score += (opponents[key(pair_placeholder = p2, p3)] || 0) * 10;
+            score += (opponents[key(p2, p4)] || 0) * 10; // Fixat saknat * tecken här
 
-            score+=
-            (teammates[key(p3,p4)]
-            ||0)*1000;
+            score += played[p1];
+            score += played[p2];
+            score += played[p3];
+            score += played[p4];
 
-            score+=
-            (opponents[key(p1,p3)]
-            ||0)*10;
-
-            score+=
-            (opponents[key(p1,p4)]
-            ||0)*10;
-
-            score+=
-            (opponents[key(p2,p3)]
-            ||0)*10;
-
-            score+=
-            (opponents[key(p2,p4)]
-            ||0)10;
-
-            score+=played[p1];
-            score+=played[p2];
-            score+=played[p3];
-            score+=played[p4];
-
-            if(score<bestScore){
-
-                bestScore=score;
-
-                best=[
-                    p1,p2,p3,p4
-                ];
+            if (score < bestScore) {
+                bestScore = score;
+                best = [p1, p2, p3, p4];
             }
         }
 
-        if(best===null){
-
-            return {
-                success:false
-            };
+        if (best === null) {
+            return { success: false };
         }
 
         schedule.push(best);
 
-        const [a,b,c,d]=best;
-
+        const [a, b, c, d] = best;
         played[a]++;
         played[b]++;
         played[c]++;
         played[d]++;
 
-        teammates[key(a,b)] =
-            (teammates[key(a,b)]||0)+1;
+        teammates[key(a, b)] = (teammates[key(a, b)] || 0) + 1;
+        teammates[key(c, d)] = (teammates[key(c, d)] || 0) + 1;
 
-        teammates[key(c,d)] =
-            (teammates[key(c,d)]||0)+1;
-
-        [
-            [a,c],
-            [a,d],
-            [b,c],
-            [b,d]
-        ].forEach(pair=>{
-
-            const k=
-                key(pair[0],pair[1]);
-
-            opponents[k]=
-                (opponents[k]||0)+1;
-
+        [[a, c], [a, d], [b, c], [b, d]].forEach(pair => {
+            const k = key(pair[0], pair[1]);
+            opponents[k] = (opponents[k] || 0) + 1;
         });
     }
 
     return {
-        success:true,
-        schedule:schedule
+        success: true,
+        schedule: schedule
     };
 }
 
-function analyzeSchedule(schedule,n){
+function analyzeSchedule(schedule, n) {
+    const teammateMap = {};
+    const opponentMap = {};
+    const played = Array(n + 1).fill(0);
 
-    const teammateMap={};
-    const opponentMap={};
-
-    const played=
-        Array(n+1).fill(0);
-
-    schedule.forEach(match=>{
-
-        const [a,b,c,d]=match;
-
+    schedule.forEach(match => {
+        const [a, b, c, d] = match;
         played[a]++;
         played[b]++;
         played[c]++;
         played[d]++;
 
-        teammateMap[key(a,b)] =
-          (teammateMap[key(a,b)]||0)+1;
+        teammateMap[key(a, b)] = (teammateMap[key(a, b)] || 0) + 1;
+        teammateMap[key(c, d)] = (teammateMap[key(c, d)] || 0) + 1;
 
-        teammateMap[key(c,d)] =
-          (teammateMap[key(c,d)]||0)+1;
-
-        [
-            [a,c],
-            [a,d],
-            [b,c],
-            [b,d]
-        ].forEach(pair=>{
-
-            const k=
-            key(
-              pair[0],
-              pair[1]
-            );
-
-            opponentMap[k] =
-            (opponentMap[k]||0)+1;
-
+        [[a, c], [a, d], [b, c], [b, d]].forEach(pair => {
+            const k = key(pair[0], pair[1]);
+            opponentMap[k] = (opponentMap[k] || 0) + 1;
         });
-
     });
 
-    let teammateRepeats=0;
-    let opponentRepeats=0;
+    let teammateRepeats = 0;
+    let opponentRepeats = 0;
+    let repeatMates = [];
+    let repeatOpps = [];
 
-    let repeatMates=[];
-    let repeatOpps=[];
-
-    Object.keys(teammateMap)
-    .forEach(k=>{
-
-        const count=
-            teammateMap[k];
-
-        if(count>1){
-
-            teammateRepeats +=
-                count-1;
-
-            repeatMates.push(
-                ${k} (${count} ggr)
-            );
+    Object.keys(teammateMap).forEach(k => {
+        const count = teammateMap[k];
+        if (count > 1) {
+            teammateRepeats += count - 1;
+            repeatMates.push(`${k} (${count} ggr)`);
         }
-
     });
 
-    Object.keys(opponentMap)
-    .forEach(k=>{
-
-        const count=
-            opponentMap[k];
-
-        if(count>1){
-
-            opponentRepeats +=
-                count-1;
-
-            repeatOpps.push(
-                ${k} (${count} ggr)
-            );
+    Object.keys(opponentMap).forEach(k => {
+        const count = opponentMap[k];
+        if (count > 1) {
+            opponentRepeats += count - 1;
+            repeatOpps.push(`${k} (${count} ggr)`);
         }
-
     });
 
-    const min=
-    Math.min(...played.slice(1));
+    const min = Math.min(...played.slice(1));
+    const max = Math.max(...played.slice(1));
+    const equal = min === max;
 
-    const max=
-    Math.max(...played.slice(1));
+    let quality = 100;
+    quality -= teammateRepeats * 10; // Fixat saknat * tecken här
+    quality -= opponentRepeats;
 
-    const equal=
-    min===max;
-
-    let quality=100;
-
-    quality -=
-    teammateRepeats10;
-
-    quality -=
-    opponentRepeats;
-
-    if(!equal){
+    if (!equal) {
         quality -= 50;
     }
 
-    quality=
-    Math.max(
-        0,
-        quality
-    );
+    quality = Math.max(0, quality);
 
-    return{
-
-        minMatches:min,
-        maxMatches:max,
-
-        equalMatches:equal,
-
+    return {
+        minMatches: min,
+        maxMatches: max,
+        equalMatches: equal,
         teammateRepeats,
         opponentRepeats,
-
         repeatMates,
         repeatOpps,
-
-        qualityScore:quality,
-
+        qualityScore: quality,
         played
-
     };
-
 }
 
-function reportHtml(r){
+function reportHtml(r) {
+    let rating = "Dåligt";
+    let color = "bad";
 
-    let rating="Dåligt";
-    let color="bad";
-
-    if(r.qualityScore>=90){
-
-        rating="Utmärkt";
-        color="good";
-
-    }else if(r.qualityScore>=75){
-
-        rating="Bra";
-        color="medium";
+    if (r.qualityScore >= 90) {
+        rating = "Utmärkt";
+        color = "good";
+    } else if (r.qualityScore >= 75) {
+        rating = "Bra";
+        color = "medium";
     }
 
-    let html="";
-
-    html+=
+    let html = `
     <div class="report">
-
     <h2>Schemarapport</h2>
+    <p><b>Alla lika många matcher:</b> ${r.equalMatches ? "Ja" : "Nej"}</p>
+    <p><b>Min matcher:</b> ${r.minMatches}</p>
+    <p><b>Max matcher:</b> ${r.maxMatches}</p>
+    <p><b>Återanvända lagkamrater:</b> ${r.teammateRepeats}</p>
+    <p><b>Återanvända motståndare:</b> ${r.opponentRepeats}</p>
+    <p class="${color}">Kvalitetspoäng: ${r.qualityScore}/100 (${rating})</p>
+    <h3>Matcher per spelare:</h3>
+    <ul>
+    `;
 
-    <p>
-    <b>Alla lika många matcher:</b>
-    ${r.equalMatches?"Ja":"Nej"}
-    </p>
-
-    <p>
-    <b>Min matcher:</b>
-    ${r.minMatches}
-    </p>
-
-    <p>
-    <b>Max matcher:</b>
-    ${r.maxMatches}
-    </p>
-
-    <p>
-    <b>Återanvända lagkamrater:</b>
-    ${r.teammateRepeats}
-    </p>
-
-    <p>
-    <b>Återanvända motståndare:</b>
-    ${r.opponentRepeats}
-    </p>
-
-    <p class="${color}">
-    Kvalitetspoäng:
-    ${r.qualityScore}/100
-    (${rating})
-    </p>
-
-    <h3>Matcher per spelare</h3>
-    ;
-
-    r.played
-    .slice(1)
-    .forEach((count,index)=>{
-
-        html+=
-        Spelare ${index+1}: ${count}<br>;
-
+    r.played.slice(1).forEach((count, index) => {
+        html += `<li>Spelare ${index + 1}: ${count} matcher</li>`;
     });
 
-    html+=
-    "<h3>Lagkamrater som upprepats</h3>";
-
-    html+=
-    r.repeatMates.length===0
-    ? "Inga<br>"
-    : r.repeatMates.join("<br>");
-
-    html+=
-    "<h3>Motståndare som upprepats</h3>";
-
-    html+=
-    r.repeatOpps.length===0
-    ? "Inga<br>"
-    : r.repeatOpps.join("<br>");
-
-    html+="</div>";
+    html += `
+    </ul>
+    </div>
+    `;
 
     return html;
 }
-
 </script>
-
 </body>
 </html>
